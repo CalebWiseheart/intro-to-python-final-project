@@ -1,5 +1,5 @@
 import pygame as pg
-from visuals import Viewport
+from visuals import Viewport, Highlighter, screen_to_world, world_to_screen
 from models import spawn_world
 
 FRAMERATE = 60
@@ -10,8 +10,12 @@ def main():
     viewport = Viewport()
     world = spawn_world(32)
 
-    viewport.set_center((16, 16))
+    selected_city = (16, 16)
+
+    viewport.set_center(selected_city)
     viewport.render_background(world)
+
+    highlighter = Highlighter()
 
     running = True
     clock = pg.Clock()
@@ -25,9 +29,12 @@ def main():
                 viewport.set_center((16, 16))
                 viewport.render_background(world)
             elif event.type == pg.MOUSEBUTTONDOWN:
-                pass
+                mouse = pg.mouse.get_pos()
+                tile_pos = screen_to_world(mouse, viewport.offset)
+                highlighter.select(world_to_screen(tile_pos, viewport.offset))
 
         viewport.clear()
+        viewport.surface.blit(highlighter.image, highlighter.rect)
         pg.display.flip()
         clock.tick(FRAMERATE)
 
