@@ -3,9 +3,16 @@ import random
 class City:
     def __init__(self):
         self.population = 128
+        self.age = [self.population]
+        self.food_supply = 0
 
     def update(self):
-        pass
+        growth = .5
+        fertility = self.population * growth
+        mortality = self.population * .1
+        delta = fertility - mortality
+        self.population += delta
+
 
 class Wilderness:
     def __init__(self):
