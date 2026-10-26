@@ -1,10 +1,21 @@
-from dataclasses import dataclass
 import pygame as pg
 
-
-class Menu(pg.sprite.Sprite):
-    def __init__(self, size, elements):
+class UIElement(pg.sprite.Sprite):
+    def __init__(self, attr, pos):
         super().__init__()
+
+        self.attr = attr
+        self.pos = pos
+
+    def anchor(self, rect):
+        setattr(self.rect, self.attr, (self.pos[0] * rect.width, self.pos[1] * rect.height))
+
+    def click(self, mouse):
+        pass
+
+class Menu(UIElement):
+    def __init__(self, size, elements):
+        super().__init__("topleft", (0, 0))
 
         self.elements = pg.sprite.Group(elements)
         self.image = None
@@ -25,22 +36,14 @@ class Menu(pg.sprite.Sprite):
             element.anchor(self.rect)
             self.image.blit(element.image, element.rect)
 
-    def spawn(self, group, attr, pos):
-        setattr(self.rect, attr, pos)
+    def spawn(self, group, rect, attr, pos):
+        self.attr = attr
+        self.pos = pos
+        self.anchor(rect)
         self.add(group)
 
     def update(self):
-        pass
-
-class UIElement(pg.sprite.Sprite):
-    def __init__(self, attr, pos):
-        super().__init__()
-
-        self.attr = attr
-        self.pos = pos
-
-    def anchor(self, rect):
-        setattr(self.rect, self.attr, (self.pos[0] * rect.width, self.pos[1] * rect.height))
+        self.elements.update()
 
 class Text(UIElement):
     def __init__(self, text, attr, pos):
@@ -54,16 +57,33 @@ class Info(Text):
     def __init__(self, attr, pos):
         super().__init__("", attr, pos)
 
-
+# Button should have three states:
+# - normal
+# - hovered: apply gray filter to image
+# - clicked: fill image white, return to normal on mouse up
 class Button(UIElement):
     def __init__(self, image, attr, pos):
         super().__init__(attr, pos)
 
-        self.image = image
+        self.base_image = image
+        self.image = self.base_image.copy()
         self.rect = self.image.get_rect()
+        self.state = "normal"
 
     def update(self):
-        pass
+        x, y = pg.mouse.get_pos()
+        if self.state == "normal" and self.rect.collidepoint(x, y):
+            self.state = "hovered"
+            self.image.fill("gray", special_flags=pg.BLEND_RGBA_MULT)
+        elif self.state == "hovered" and not self.rect.collidepoint(x, y):
+            self.state = "normal"
+            self.image = self.base_image.copy()
+        elif self.state == "hovered" and pg.mouse.get_pressed()[0]:
+            self.state = "clicked"
+            self.image.fill("white")
+        elif self.state == "clicked" and not pg.mouse.get_pressed()[0]:
+            self.state = "normal"
+            self.image = self.base_image.copy()
 
 class Switch(UIElement):
     def __init__(self, size, attr, pos):
@@ -89,6 +109,5 @@ class Switch(UIElement):
             (self.rect.width // 2, self.rect.height * 5 // 6)
         ])
 
-
-
-
+    def update(self):
+        pass
