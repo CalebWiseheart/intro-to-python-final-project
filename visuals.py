@@ -46,8 +46,8 @@ class Viewport:
         vec = (pg.Vector2(point) + self.offset) // TILE_SIDE_LEN
         return int(vec.x), int(vec.y)
 
-    def normalize_pos(self, pos):
-        x, y = pos
+    def normalize_point(self, point):
+        x, y = point
         return x / self.rect.width, y / self.rect.height
 
 

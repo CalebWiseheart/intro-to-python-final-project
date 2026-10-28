@@ -1,7 +1,7 @@
 import pygame as pg
 from visuals import Viewport, Highlighter
-from user_interface import Menu, Text, Info, Switch, Button
-from models import spawn_world
+from user_interface import Menu, Text, Info, Switch, Button, Select
+from models import World, City, Wilderness, Field
 
 FRAMERATE = 60
 
@@ -19,31 +19,32 @@ def main():
     pg.init()
 
     viewport = Viewport()
-    world = spawn_world(32)
+    world = World()
+    world.spawn(32)
 
-    selected_city = (16, 16)
-
-    viewport.set_center(selected_city)
-    viewport.render_background(world)
+    viewport.set_center(world.current_city)
+    viewport.render_background(world.tiles)
 
     highlighter = Highlighter()
+
+    counter = Switch((20, 40), "midright", (.9, .3))
 
     wilderness_menu = Menu((250, 375), [
         Text("Wilderness", "center", (.5, .2)),
         Text("Hunter Gatherers: ", "midleft", (.1, .3)),
         Text("Last Yield: ", "midleft", (.1, .4)),
-        Switch((20, 40), "midright", (.9, .3)),
-        Info("midright", (.8, .3)),
-        Button(render_next(), "center", (.5, .9))
+        counter,
+        Info(counter, "count", "midright", (.8, .3)),
+        Select("Option", "center", (.5, .8))
     ])
 
     plain_menu = Menu((250, 375), [])
 
     field_menu = Menu((250, 375), [])
 
-    button = Button(render_next(), "topright", (.99, .01))
-    population = Info("topcenter", (.5, .01))
-    ui = pg.sprite.LayeredUpdates(button, )
+    button = Button(render_next(), world.update, "topright", (.99, .01))
+    population = Info(world, "population", "center", (.5, .05), True)
+    ui = pg.sprite.LayeredUpdates(button, population)
     anchor_all(ui, viewport.rect)
 
     running = True
@@ -64,17 +65,28 @@ def main():
                 interaction = ui.get_sprites_at(mouse)
                 if interaction:
                     element = interaction[0]
-                    # tell element mouse has clicked them
-
+                    element.click(mouse)
                 else:
                     tile_pos = viewport.screen_to_world(mouse)
                     highlighter.select(tile_pos, viewport)
-                    wilderness_menu.spawn(ui, viewport.rect,"topright", viewport.normalize_pos((
-                        highlighter.rect.x - 25,
-                        highlighter.rect.y - wilderness_menu.rect.height * .25
-                    )))
+                    tile = world.get_tile(tile_pos)
+
+                    if type(tile) is Wilderness:
+                        wilderness_menu.spawn(ui, viewport.rect,"topright", viewport.normalize_point((
+                            highlighter.rect.x - 25,
+                            highlighter.rect.y - wilderness_menu.rect.height * .25
+                        )))
+                    elif type(tile) is Field:
+                        pass
+                    elif type(tile) is City:
+                        pass
+                    else:
+                        pass
 
         ui.update()
+        if population.reanchor:
+            population.reanchor = False
+            population.anchor(viewport.rect)
         viewport.clear()
         viewport.surface.blit(highlighter.image, highlighter.rect)
         ui.draw(viewport.surface)
