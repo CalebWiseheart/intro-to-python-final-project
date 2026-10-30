@@ -1,6 +1,6 @@
 import pygame as pg
 from visuals import Viewport, Highlighter
-from user_interface import Menu, Text, Info, Switch, Button, Select
+from user_interface import WildernessMenu, PlainMenu, FieldMenu, Button, Info
 from models import World, City, Wilderness, Field
 
 FRAMERATE = 60
@@ -27,20 +27,9 @@ def main():
 
     highlighter = Highlighter()
 
-    counter = Switch((20, 40), "midright", (.9, .3))
-
-    wilderness_menu = Menu((250, 375), [
-        Text("Wilderness", "center", (.5, .2)),
-        Text("Hunter Gatherers: ", "midleft", (.1, .3)),
-        Text("Last Yield: ", "midleft", (.1, .4)),
-        counter,
-        Info(counter, "count", "midright", (.8, .3)),
-        Select("Option", "center", (.5, .8))
-    ])
-
-    plain_menu = Menu((250, 375), [])
-
-    field_menu = Menu((250, 375), [])
+    wilderness_menu = WildernessMenu()
+    plain_menu = PlainMenu()
+    field_menu = FieldMenu()
 
     button = Button(render_next(), world.update, "topright", (.99, .01))
     population = Info(world, "population", "center", (.5, .05), True)
@@ -71,22 +60,36 @@ def main():
                     highlighter.select(tile_pos, viewport)
                     tile = world.get_tile(tile_pos)
 
-                    if type(tile) is Wilderness:
-                        wilderness_menu.spawn(ui, viewport.rect,"topright", viewport.normalize_point((
+                    if mouse[0] < viewport.rect.width // 2:
+                        spawn_attr = "topright"
+                        spawn_pos = viewport.normalize_point((
                             highlighter.rect.x - 25,
-                            highlighter.rect.y - wilderness_menu.rect.height * .25
-                        )))
+                            highlighter.rect.y - 25
+                        ))
+                    else:
+                        spawn_attr = "topleft"
+                        spawn_pos = viewport.normalize_point((
+                            highlighter.rect.topright[0] + 25,
+                            highlighter.rect.topright[1] - 25
+                        ))
+
+                    if type(tile) is Wilderness:
+                        wilderness_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
+                        field_menu.kill()
+                        plain_menu.kill()
                     elif type(tile) is Field:
-                        pass
+                        field_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
+                        wilderness_menu.kill()
+                        plain_menu.kill()
                     elif type(tile) is City:
                         pass
                     else:
-                        pass
+                        plain_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
+                        wilderness_menu.kill()
+                        field_menu.kill()
 
         ui.update()
-        if population.reanchor:
-            population.reanchor = False
-            population.anchor(viewport.rect)
+        anchor_all(ui, viewport.rect)
         viewport.clear()
         viewport.surface.blit(highlighter.image, highlighter.rect)
         ui.draw(viewport.surface)

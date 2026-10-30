@@ -19,20 +19,20 @@ class UIElement(pg.sprite.Sprite):
     def click(self, mouse):
         x, y = self.as_relative(mouse)
 
+
 class Menu(UIElement):
     def __init__(self, size, elements):
         super().__init__("topleft", (0, 0))
 
         self.elements = pg.sprite.Group(elements)
-        self.image = None
-        self.rect = pg.Rect(0, 0, size[0], size[1])
+        self.image = pg.Surface(size)  # Image is static so elements are unresponsive
+        self.rect = self.image.get_rect()
         self.render()
 
     def render(self):
         self.image = pg.Surface(self.rect.size)
         self.image.fill("black")
         draw_border(self.image, 10)
-
         for element in self.elements.sprites():
             element.anchor(self.rect)
             self.image.blit(element.image, element.rect)
@@ -50,11 +50,9 @@ class Menu(UIElement):
                 element.click(rel_mouse)
 
     def update(self):
-        for element in self.elements.sprites():
-            if type(element) == Text and element.reanchor:
-                element.reanchor = False
-                element.anchor(self.rect)
-            element.update()
+        self.elements.update()
+        self.render()
+
 
 class Text(UIElement):
     def __init__(self, text, attr, pos, header=False):
@@ -66,12 +64,11 @@ class Text(UIElement):
             self.font = pg.font.SysFont("", 24)
         self.image = self.font.render(text, True, "white")
         self.rect = self.image.get_rect()
-        self.reanchor = False
 
     def render(self, text):
-        self.reanchor = True
         self.image = self.font.render(text, True, "white")
         self.rect = self.image.get_rect()
+
 
 class Info(Text):
     def __init__(self, obj, name, attr, pos,  header=False):
@@ -86,6 +83,7 @@ class Info(Text):
         if data != self.text:
             self.text = data
             self.render(self.text)
+
 
 class Button(UIElement):
     def __init__(self, image, onclick, attr, pos):
@@ -135,36 +133,71 @@ class Switch(UIElement):
 
     def click(self, mouse):
         if mouse[0] < self.rect.centerx:
-            self.count += 1
+            self.count += 16
         else:
-            self.count = self.count - 1 if self.count > 0 else 0
+            self.count = self.count - 16 if self.count > 0 else 0
+
 
 class Select(UIElement):
     def __init__(self, text, attr, pos):
         super().__init__(attr, pos)
 
         self.font = pg.font.SysFont("", 24)
-        text_image = self.font.render(text, True, "black")
+        text_image = self.font.render(text, True, "white")
         text_rect = text_image.get_rect()
 
         self.src_image = pg.Surface(text_rect.inflate(25, 25).size)
-        self.image = self.src_image.copy()
-        self.rect = self.image.get_rect()
+        self.rect = self.src_image.get_rect()
 
-        self.image.fill("gray")
-        pg.draw.rect(self.image, "white", self.rect, 2)
+        self.src_image.fill("black")
+        pg.draw.rect(self.src_image, "white", self.rect, 2)
         text_rect.center = self.rect.center
-        self.image.blit(text_image, text_rect)
+        self.src_image.blit(text_image, text_rect)
+
+        self.image = self.src_image.copy()
 
         self.on = False
 
     def click(self, mouse):
         if not self.on:
             self.on = True
-            self.image.fill("black", special_flags=pg.BLEND_RGBA_MULT)
+            self.image.fill("gray", special_flags=pg.BLEND_RGBA_MULT)
         else:
             self.on = False
             self.image = self.src_image.copy()
+
+
+class WildernessMenu(Menu):
+    def __init__(self):
+        self.counter = Switch((20, 40), "midright", (.9, .3))
+        self.to_plain = Select("Burn Down", "midleft", (.15, .6))
+
+        super().__init__((250, 375), [
+            Text("Wilderness", "center", (.5, .15)),
+            Text("Hunter Gatherers: ", "midleft", (.1, .3)),
+            Text("Last Yield: ", "midleft", (.1, .4)),
+            self.counter,
+            Info(self.counter, "count", "midright", (.8, .3)),
+            self.to_plain
+        ])
+
+class PlainMenu(Menu):
+    def __init__(self):
+        super().__init__((200, 200), [
+            Text("Plains", "center", (.5, .25)),
+            Select("Till", "center", (.5, .50)),
+            Select("Settle", "center", (.5, .75))
+        ])
+
+
+class FieldMenu(Menu):
+    def __init__(self):
+        super().__init__((250, 375), [
+            Text("Field", "center", (.5, .15)),
+            Text("Farmers: ", "midleft", (.1, .3)),
+            Text("Last Yield: ", "midleft", (.1, .4))
+        ])
+
 
 def draw_border(image, width):
     rect = image.get_rect()
