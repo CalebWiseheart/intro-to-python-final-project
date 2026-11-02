@@ -1,60 +1,33 @@
 import pygame as pg
-
 from models import Task
 
-
+# Base class representing a sprite that can be interacted with by the user through the mouse to set options with a
+# nonfixed position; through a position normalized between 0 and 1 on an arbitrary parent rect, and the attribute of its
+# sprites rect associated with that position; with methods for anchoring the sprites rect to a parent rect, and
+# converting a point relative to the parent rect to a point relative to itself
 class UIElement(pg.sprite.Sprite):
     def __init__(self, attr, pos):
         super().__init__()
 
-        self.attr = attr
-        self.tile_pos = pos
+        self.anchor_at = attr
+        self.anchor_to = pos
 
+    # Given a parent rect, sets the anchor at attribute of its rect to the anchor to position denormalized within the
+    # parent rect; so that if anchor to is (0, 0) anchor at will be set to the top left corner, and if it is (1, 1) it
+    # will be set to the bottom right corner
     def anchor(self, rect):
-        setattr(self.rect, self.attr, (self.tile_pos[0] * rect.width, self.tile_pos[1] * rect.height))
+        setattr(self.rect, self.anchor_at, (self.anchor_to[0] * rect.width, self.anchor_to[1] * rect.height))
 
+    # Given a point its last anchored rect, returns that point converted to be relative to its own rects topleft corner
     def as_relative(self, point):
         x, y = point
         x -= self.rect.x
         y -= self.rect.y
         return x, y
 
+    # Template method to be called when the mouse interacts with the element
     def click(self, mouse):
         x, y = self.as_relative(mouse)
-
-
-class Menu(UIElement):
-    def __init__(self, size, elements):
-        super().__init__("topleft", (0, 0))
-
-        self.elements = pg.sprite.Group(elements)
-        self.image = pg.Surface(size)
-        self.rect = self.image.get_rect()
-        self.render()
-
-    def render(self):
-        self.image = pg.Surface(self.rect.size)
-        self.image.fill("black")
-        draw_border(self.image, 10)
-        for element in self.elements.sprites():
-            element.anchor(self.rect)
-            self.image.blit(element.image, element.rect)
-
-    def spawn(self, group, rect, attr, pos):
-        self.attr = attr
-        self.tile_pos = pos
-        self.anchor(rect)
-        self.add(group)
-
-    def click(self, mouse):
-        rel_mouse = self.as_relative(mouse)
-        for element in self.elements.sprites():
-            if element.rect.collidepoint(rel_mouse):
-                element.click(rel_mouse)
-
-    def update(self):
-        self.elements.update()
-        self.render()
 
 
 class Text(UIElement):
@@ -170,6 +143,61 @@ class Select(UIElement):
             self.image = self.src_image.copy()
 
 
+# Represents a UI element that contains and manages other UI Elements to create a menu through a group of UI elements
+# with methods for drawing the menu with all of its elements anchored, and for notifying its elements when they are
+# clicked, and for spawning the menu on screen
+class Menu(UIElement):
+    def __init__(self, size, elements):
+        super().__init__("topleft", (0, 0))
+
+        self.elements = pg.sprite.Group(elements)
+        self.image = pg.Surface(size)
+        self.rect = self.image.get_rect()
+        self.render()
+
+    # Draws a black background with a white border on its image, then iterates over each element and anchors it to its
+    # rect and draws it to its images
+    def render(self):
+        self.image = pg.Surface(self.rect.size)
+        self.image.fill("black")
+        rect = self.image.get_rect()
+        pg.draw.rect(self.image, "white", (
+            rect.width * .05,
+            rect.height * .05,
+            rect.width * .9,
+            rect.height * .9
+        ), 10)
+
+        for element in self.elements.sprites():
+            element.anchor(self.rect)
+            self.image.blit(element.image, element.rect)
+
+    # Given a group of UI elements, a rect to be anchored to, and the attribute and position to anchor; sets its
+    # anchor at and anchor to attributes, then anchors itself to the rect, and then adds itself to the group
+    def spawn(self, group, rect, attr, pos):
+        self.anchor_at = attr
+        self.anchor_to = pos
+        self.anchor(rect)
+        self.add(group)
+
+    # Given the position of the mouse assuming the mouse has been clicked; converts the position to be relative to
+    # itself and then iterates over its elements and if the mouse is over an element click is called on that element
+    # with the relative position
+    def click(self, mouse):
+        rel_mouse = self.as_relative(mouse)
+        for element in self.elements.sprites():
+            if element.rect.collidepoint(rel_mouse):
+                element.click(rel_mouse)
+
+    def update(self):
+        self.elements.update()
+        self.render()
+
+
+# Subclass of Menu that represents a menu for a managing a task on a wilderness tile; through a reference to the current
+# city, the task to give to the city, the position of the tasks tile, and hard coded ui elements; with methods for
+# setting the task, city, and pos after spawning the menu, and for managing the task as the game updates, and for giving
+# the city the task before removing itself from its groups
 class WildernessMenu(Menu):
     def __init__(self):
         self.city = None
@@ -187,13 +215,18 @@ class WildernessMenu(Menu):
             self.to_plain
         ])
 
+    # Given the current city, the position of the selected tile, and a reference to the tile; sets its city and
+    # task pos, then gets the task for that tile from the city and sets its own task to that task if it exists, if else
+    # its task is set to a new task created from the tile
     def set_task(self, city, pos, tile):
         self.city = city
         self.task_pos = pos
         last_task = self.city.get_task(self.task_pos)
-        self.task = last_task if last_task is not None else Task.collect(0, tile)
+        self.task = last_task if last_task is not None else Task.collect(tile)
         self.counter.count = self.task.workers
 
+    # Updates the task within the city if the task has workers, if else ensures the task is removed from the city, and
+    # then removes itself from all of its groups
     def close(self):
         if self.task is not None and self.task.workers > 0:
             self.city.add_task(self.task_pos, self.task)
@@ -209,7 +242,7 @@ class WildernessMenu(Menu):
         if self.task is not None and not self.to_plain.on:
             self.task.workers = self.counter.count
         elif self.task is not None and self.task.type == "collect":
-            self.task = Task.build_plain(self.task.tile, self.task.pos)
+            self.task = Task.build_plain(self.task.tile)
 
 class PlainMenu(Menu):
     def __init__(self):
@@ -227,13 +260,3 @@ class FieldMenu(Menu):
             Text("Farmers: ", "midleft", (.1, .3)),
             Text("Last Yield: ", "midleft", (.1, .4))
         ])
-
-
-def draw_border(image, width):
-    rect = image.get_rect()
-    pg.draw.rect(image, "white", (
-        rect.width * .05,
-        rect.height * .05,
-        rect.width * .9,
-        rect.height * .9
-    ), width)

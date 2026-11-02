@@ -1,7 +1,7 @@
 import pygame as pg
 from visuals import Viewport, Highlighter
 from user_interface import WildernessMenu, PlainMenu, FieldMenu, Button, Info
-from models import World, City, Wilderness, Field, Task
+from models import World, City, Wilderness, Field
 
 FRAMERATE = 60
 
@@ -22,7 +22,7 @@ def main():
     world = World()
     world.spawn(32)
 
-    viewport.set_center(world.city_pos)
+    viewport.set_center(world.current_pos)
     viewport.render_background(world.tiles)
 
     highlighter = Highlighter()
