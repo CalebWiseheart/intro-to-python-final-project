@@ -1,14 +1,17 @@
 import pygame as pg
 
+from models import Task
+
+
 class UIElement(pg.sprite.Sprite):
     def __init__(self, attr, pos):
         super().__init__()
 
         self.attr = attr
-        self.pos = pos
+        self.tile_pos = pos
 
     def anchor(self, rect):
-        setattr(self.rect, self.attr, (self.pos[0] * rect.width, self.pos[1] * rect.height))
+        setattr(self.rect, self.attr, (self.tile_pos[0] * rect.width, self.tile_pos[1] * rect.height))
 
     def as_relative(self, point):
         x, y = point
@@ -25,7 +28,7 @@ class Menu(UIElement):
         super().__init__("topleft", (0, 0))
 
         self.elements = pg.sprite.Group(elements)
-        self.image = pg.Surface(size)  # Image is static so elements are unresponsive
+        self.image = pg.Surface(size)
         self.rect = self.image.get_rect()
         self.render()
 
@@ -39,7 +42,7 @@ class Menu(UIElement):
 
     def spawn(self, group, rect, attr, pos):
         self.attr = attr
-        self.pos = pos
+        self.tile_pos = pos
         self.anchor(rect)
         self.add(group)
 
@@ -169,17 +172,44 @@ class Select(UIElement):
 
 class WildernessMenu(Menu):
     def __init__(self):
+        self.city = None
+        self.task_pos = None
+        self.task = None
         self.counter = Switch((20, 40), "midright", (.9, .3))
         self.to_plain = Select("Burn Down", "midleft", (.15, .6))
 
         super().__init__((250, 375), [
             Text("Wilderness", "center", (.5, .15)),
-            Text("Hunter Gatherers: ", "midleft", (.1, .3)),
+            Text("Hunters: ", "midleft", (.1, .3)),
             Text("Last Yield: ", "midleft", (.1, .4)),
             self.counter,
             Info(self.counter, "count", "midright", (.8, .3)),
             self.to_plain
         ])
+
+    def set_task(self, city, pos, tile):
+        self.city = city
+        self.task_pos = pos
+        last_task = self.city.get_task(self.task_pos)
+        self.task = last_task if last_task is not None else Task.collect(0, tile)
+        self.counter.count = self.task.workers
+
+    def close(self):
+        if self.task is not None and self.task.workers > 0:
+            self.city.add_task(self.task_pos, self.task)
+            self.task = None
+        elif self.city is not None:
+            self.city.remove_task(self.task_pos)
+        self.kill()
+
+    def update(self):
+        self.elements.update()
+        self.render()
+
+        if self.task is not None and not self.to_plain.on:
+            self.task.workers = self.counter.count
+        elif self.task is not None and self.task.type == "collect":
+            self.task = Task.build_plain(self.task.tile, self.task.pos)
 
 class PlainMenu(Menu):
     def __init__(self):
@@ -207,4 +237,3 @@ def draw_border(image, width):
         rect.width * .9,
         rect.height * .9
     ), width)
-

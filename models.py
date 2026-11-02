@@ -1,14 +1,21 @@
 import random
+import math
+from dataclasses import dataclass
+
 
 class World:
     def __init__(self):
         self.tiles = []
         self.city_graph = {}
         self.population = 0
-        self.current_city = None
+        self.city_pos = None
 
     def get_tile(self, pos) -> object:
         x, y = pos
+        return self.tiles[y][x]
+
+    def get_city(self):
+        x, y = self.city_pos
         return self.tiles[y][x]
 
     def spawn(self, side_len):
@@ -18,9 +25,9 @@ class World:
             None for x in range(side_len)
         ] for y in range(side_len)]
 
-        self.current_city = (side_len // 2, side_len // 2)
-        self.city_graph = {self.get_tile(self.current_city): []}
-        self.population = self.get_tile(self.current_city).population
+        self.city_pos = (side_len // 2, side_len // 2)
+        self.city_graph = {self.get_tile(self.city_pos): []}
+        self.population = self.get_tile(self.city_pos).population
 
     def update(self):
         for row in self.tiles:
@@ -36,24 +43,87 @@ class World:
 
 class City:
     def __init__(self):
-        self.population = 128
-        self.age = [self.population]
+        self.population = 32
+        self.morale = 50
         self.food_supply = 0
+        self.tasks = {}
+        self.hunters = 0
+        self.farmers = 0
+
+    def get_task(self, pos):
+        if pos in self.tasks:
+            return self.tasks[pos]
+        else:
+            return None
+
+    def add_task(self, pos, task):
+        self.tasks[pos] = task
+
+    def remove_task(self, pos):
+        if pos in self.tasks:
+            del self.tasks[pos]
+
+    def complete_tasks(self):
+        for pos in self.tasks:
+            task = self.tasks[pos]
+            if task.type == "collect":
+                self.food_supply += task.tile.collect(task.workers)
+            else:
+                del self.tasks[pos]
 
     def update(self):
-        growth = .5
-        fertility = round(self.population * growth)
-        mortality = round(self.population * .1)
-        delta = fertility - mortality
-        self.population += delta
+        self.complete_tasks()
+        decrease = 0
 
+        if self.population > self.food_supply:
+            decrease += self.population - self.food_supply
+            self.food_supply = 0
+            growth = .1
+        else:
+            demand = (self.hunters * 6 + self.farmers * 5 + (self.population - self.hunters - self.farmers) * 4)
+            fullness = self.food_supply / demand
+            growth = .5 + (3 - .5) * fullness if fullness < 1 else 1
+            self.food_supply -= min(demand, self.food_supply)
+
+        increase = round(self.population * growth)
+        decrease = round(decrease)
+        self.population += increase - decrease
+
+
+@dataclass
+class Task:
+    workers: int
+    tile: object
+    type: str
+
+    @staticmethod
+    def collect(workers, tile):
+        return Task(workers, tile, "collect")
+
+    @staticmethod
+    def build_plain(tile):
+        return Task(128, tile, "build plain")
+
+    @staticmethod
+    def build_field(tile):
+        return Task(64, tile, "build field")
+
+    @staticmethod
+    def build_city(tile):
+        return Task(64, tile, "build city")
 
 class Wilderness:
     def __init__(self):
-        pass
+        self.resources = 1000
+
+    def collect(self, workers):
+        taken = workers * 2
+        self.resources -= taken
+        return taken
 
     def update(self):
-        pass
+        self.resources += self.resources * (1 - self.resources / 1000)
+
 
 class Field:
     def __init__(self):

@@ -1,11 +1,11 @@
 import pygame as pg
 from visuals import Viewport, Highlighter
 from user_interface import WildernessMenu, PlainMenu, FieldMenu, Button, Info
-from models import World, City, Wilderness, Field
+from models import World, City, Wilderness, Field, Task
 
 FRAMERATE = 60
 
-def render_next():
+def render_button():
     image = pg.Surface((50, 50), pg.SRCALPHA)
     pg.draw.polygon(image, "white", [(0, 0), (30, 25), (0, 50)])
     pg.draw.rect(image, "white", (35, 0, 15, 50))
@@ -22,7 +22,7 @@ def main():
     world = World()
     world.spawn(32)
 
-    viewport.set_center(world.current_city)
+    viewport.set_center(world.city_pos)
     viewport.render_background(world.tiles)
 
     highlighter = Highlighter()
@@ -31,7 +31,11 @@ def main():
     plain_menu = PlainMenu()
     field_menu = FieldMenu()
 
-    button = Button(render_next(), world.update, "topright", (.99, .01))
+    def close_and_update():
+        wilderness_menu.close()
+        world.update()
+
+    button = Button(render_button(), close_and_update, "topright", (.99, .01))
     population = Info(world, "population", "center", (.5, .05), True)
     ui = pg.sprite.LayeredUpdates(button, population)
     anchor_all(ui, viewport.rect)
@@ -74,18 +78,20 @@ def main():
                         ))
 
                     if type(tile) is Wilderness:
+                        wilderness_menu.close()
                         wilderness_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
+                        wilderness_menu.set_task(world.get_city(), tile_pos, tile)
                         field_menu.kill()
                         plain_menu.kill()
                     elif type(tile) is Field:
                         field_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
-                        wilderness_menu.kill()
+                        wilderness_menu.close()
                         plain_menu.kill()
                     elif type(tile) is City:
                         pass
                     else:
                         plain_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
-                        wilderness_menu.kill()
+                        wilderness_menu.close()
                         field_menu.kill()
 
         ui.update()
