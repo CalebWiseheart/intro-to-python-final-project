@@ -31,11 +31,12 @@ def main():
     plain_menu = PlainMenu()
     field_menu = FieldMenu()
 
-    def close_and_update():
+    def update_and_refresh():
         wilderness_menu.close()
         world.update()
+        viewport.render_background(world.tiles)
 
-    button = Button(render_button(), close_and_update, "topright", (.99, .01))
+    button = Button(render_button(), update_and_refresh, "topright", (.99, .01))
     population = Info(world, "population", "center", (.5, .05), True)
     ui = pg.sprite.LayeredUpdates(button, population)
     anchor_all(ui, viewport.rect)

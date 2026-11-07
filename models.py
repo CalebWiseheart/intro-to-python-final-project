@@ -24,6 +24,10 @@ class World:
         x, y = self.current_pos
         return self.tiles[y][x]
 
+
+    def connect_city(self, city):
+        pass
+
     # Given the side length of the world, fills its tiles list randomly with wilderness and plains tiles up to the side
     # length with one city tile in the center, then sets the current pos to the starting city, adds the starting city to
     # the city graph, and sets the total population to the starting cities population
@@ -38,6 +42,19 @@ class World:
         self.city_graph = {self.get_tile(self.current_pos): []}
         self.population = self.get_city().population
 
+    def construct_tiles(self, city):
+        for (x, y), build_type in city.construction:
+            if build_type == "build plain":
+                self.tiles[y][x] = None
+            elif build_type == "build field":
+                self.tiles[y][x] = Field()
+            else:
+                city = City()
+                self.connect_city(city)
+                self.tiles[y][x] = city
+            del city.tasks[(x, y)]
+        city.construction = []
+
     def update(self):
         for row in self.tiles:
             for tile in row:
@@ -47,6 +64,7 @@ class World:
         self.population = 0
         for city in self.city_graph:
             city.update()
+            self.construct_tiles(city)
             self.population += city.population
 
 
@@ -56,6 +74,7 @@ class City:
         self.morale = 50
         self.food_supply = 0
         self.tasks = {}
+        self.construction = []
         self.hunters = 0
         self.farmers = 0
 
@@ -78,7 +97,7 @@ class City:
             if task.type == "collect":
                 self.food_supply += task.tile.collect(task.workers)
             else:
-                del self.tasks[pos]
+                self.construction.append((pos, task.type))
 
     def update(self):
         self.complete_tasks()
@@ -106,8 +125,8 @@ class Task:
     type: str
 
     @staticmethod
-    def collect(tile):
-        return Task(0, tile, "collect")
+    def collect(tile, workers=0):
+        return Task(workers, tile, "collect")
 
     @staticmethod
     def build_plain(tile):

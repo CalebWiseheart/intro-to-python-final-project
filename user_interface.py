@@ -114,7 +114,7 @@ class Switch(UIElement):
             self.count = self.count - 16 if self.count > 0 else 0
 
 
-class Select(UIElement):
+class Option(UIElement):
     def __init__(self, text, attr, pos):
         super().__init__(attr, pos)
 
@@ -133,14 +133,23 @@ class Select(UIElement):
         self.image = self.src_image.copy()
 
         self.on = False
+        self.alts = []
+
+    def toggle_on(self):
+        self.on = True
+        self.image.fill("gray", special_flags=pg.BLEND_RGBA_MULT)
+
+    def toggle_off(self):
+        self.on = False
+        self.image = self.src_image.copy()
 
     def click(self, mouse):
         if not self.on:
-            self.on = True
-            self.image.fill("gray", special_flags=pg.BLEND_RGBA_MULT)
+            self.toggle_on()
+            for option in self.alts:
+                option.toggle_off()
         else:
-            self.on = False
-            self.image = self.src_image.copy()
+            self.toggle_off()
 
 
 # Represents a UI element that contains and manages other UI Elements to create a menu through a group of UI elements
@@ -180,6 +189,10 @@ class Menu(UIElement):
         self.anchor(rect)
         self.add(group)
 
+    # Template method for cleanup before removing itself from its groups
+    def close(self):
+        self.kill()
+
     # Given the position of the mouse assuming the mouse has been clicked; converts the position to be relative to
     # itself and then iterates over its elements and if the mouse is over an element click is called on that element
     # with the relative position
@@ -193,6 +206,39 @@ class Menu(UIElement):
         self.elements.update()
         self.render()
 
+class TaskMaker:
+    def __init__(self, city, pos, tile):
+        self.city = city
+        self.pos = pos
+        self.tile = tile
+        last_task = self.city.get_task(self.pos)
+        self.task = last_task if last_task is not None else Task.collect(tile)
+
+    def send(self):
+        if self.task.workers > 0:
+            self.city.add_task(self.pos, self.task)
+        else:
+            self.city.remove_task(self.pos)
+
+
+class TileMenu(Menu):
+    def __init__(self, size, elements):
+        super().__init__(size, elements)
+        self.task_maker = None
+
+    # Given the current city, the position of the selected tile, and a reference to the tile; sets its task maker to a
+    # new task maker constructed using the city, position, and tile
+    def set_task(self, city, pos, tile):
+        self.task_maker = TaskMaker(city, pos, tile)
+
+    # Updates the task within the city if the task has workers, if else ensures the task is removed from the city, and
+    # then removes itself from all of its groups
+    def close(self):
+        if self.task_maker is not None:
+            self.task_maker.send()
+            self.task_maker = None
+        self.kill()
+
 
 # Subclass of Menu that represents a menu for a managing a task on a wilderness tile; through a reference to the current
 # city, the task to give to the city, the position of the tasks tile, and hard coded ui elements; with methods for
@@ -200,11 +246,9 @@ class Menu(UIElement):
 # the city the task before removing itself from its groups
 class WildernessMenu(Menu):
     def __init__(self):
-        self.city = None
-        self.task_pos = None
-        self.task = None
+        self.task_maker = None
         self.counter = Switch((20, 40), "midright", (.9, .3))
-        self.to_plain = Select("Burn Down", "midleft", (.15, .6))
+        self.to_plain = Option("Burn Down", "midleft", (.15, .6))
 
         super().__init__((250, 375), [
             Text("Wilderness", "center", (.5, .15)),
@@ -215,43 +259,40 @@ class WildernessMenu(Menu):
             self.to_plain
         ])
 
-    # Given the current city, the position of the selected tile, and a reference to the tile; sets its city and
-    # task pos, then gets the task for that tile from the city and sets its own task to that task if it exists, if else
-    # its task is set to a new task created from the tile
+    # Given the current city, the position of the selected tile, and a reference to the tile; sets its task maker to a
+    # new task maker constructed using the city, position, and tile, then sets its counters count to the tasks workers
     def set_task(self, city, pos, tile):
-        self.city = city
-        self.task_pos = pos
-        last_task = self.city.get_task(self.task_pos)
-        self.task = last_task if last_task is not None else Task.collect(tile)
-        self.counter.count = self.task.workers
-
-    # Updates the task within the city if the task has workers, if else ensures the task is removed from the city, and
-    # then removes itself from all of its groups
-    def close(self):
-        if self.task is not None and self.task.workers > 0:
-            self.city.add_task(self.task_pos, self.task)
-            self.task = None
-        elif self.city is not None:
-            self.city.remove_task(self.task_pos)
-        self.kill()
+        self.task_maker = TaskMaker(city, pos, tile)
+        self.counter.count = self.task_maker.task.workers
 
     def update(self):
         self.elements.update()
         self.render()
 
-        if self.task is not None and not self.to_plain.on:
-            self.task.workers = self.counter.count
-        elif self.task is not None and self.task.type == "collect":
-            self.task = Task.build_plain(self.task.tile)
+        if self.task_maker is not None:
+            if not self.to_plain.on and self.task_maker.task.type != "collect":
+                self.task_maker.task = Task.collect(self.task_maker.task.tile, self.task_maker.task.workers)
+            if not self.to_plain.on and self.task_maker.task.workers != self.counter.count:
+                self.task_maker.task.workers = self.counter.count
+            elif self.to_plain.on and self.task_maker.task.type == "collect":
+                self.task_maker.task = Task.build_plain(self.task_maker.tile)
+                self.counter.count = self.task_maker.task.workers
 
 class PlainMenu(Menu):
     def __init__(self):
+        self.task = None
+        self.to_field = Option("Till", "center", (.5, .50))
+        self.to_city = Option("Settle", "center", (.5, .75))
+        self.to_field.alts.append(self.to_city)
+        self.to_city.alts.append(self.to_field)
         super().__init__((200, 200), [
             Text("Plains", "center", (.5, .25)),
-            Select("Till", "center", (.5, .50)),
-            Select("Settle", "center", (.5, .75))
+            self.to_field,
+            self.to_city
         ])
 
+    def set_task(self):
+        pass
 
 class FieldMenu(Menu):
     def __init__(self):
@@ -260,3 +301,6 @@ class FieldMenu(Menu):
             Text("Farmers: ", "midleft", (.1, .3)),
             Text("Last Yield: ", "midleft", (.1, .4))
         ])
+
+    def update(self):
+        pass
