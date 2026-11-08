@@ -207,18 +207,18 @@ class Menu(UIElement):
         self.render()
 
 class TaskMaker:
-    def __init__(self, city, pos, tile):
-        self.city = city
+    def __init__(self, labor, pos, tile):
+        self.labor = labor
         self.pos = pos
         self.tile = tile
-        last_task = self.city.get_task(self.pos)
+        last_task = self.labor.get_task(self.pos)
         self.task = last_task if last_task is not None else Task.collect(tile)
 
     def send(self):
         if self.task.workers > 0:
-            self.city.add_task(self.pos, self.task)
+            self.labor.add_task(self.pos, self.task)
         else:
-            self.city.remove_task(self.pos)
+            self.labor.remove_task(self.pos)
 
 
 class TileMenu(Menu):
@@ -228,8 +228,8 @@ class TileMenu(Menu):
 
     # Given the current city, the position of the selected tile, and a reference to the tile; sets its task maker to a
     # new task maker constructed using the city, position, and tile
-    def set_task(self, city, pos, tile):
-        self.task_maker = TaskMaker(city, pos, tile)
+    def set_task(self, labor, pos, tile):
+        self.task_maker = TaskMaker(labor, pos, tile)
 
     # Updates the task within the city if the task has workers, if else ensures the task is removed from the city, and
     # then removes itself from all of its groups
@@ -260,8 +260,8 @@ class WildernessMenu(TileMenu):
 
     # Given the current city, the position of the selected tile, and a reference to the tile; sets its task maker to a
     # new task maker constructed using the city, position, and tile, then sets its counters count to the tasks workers
-    def set_task(self, city, pos, tile):
-        self.task_maker = TaskMaker(city, pos, tile)
+    def set_task(self, labor, pos, tile):
+        self.task_maker = TaskMaker(labor, pos, tile)
         self.counter.count = self.task_maker.task.workers
 
     def update(self):
@@ -292,8 +292,8 @@ class PlainMenu(TileMenu):
             self.to_city
         ])
 
-    def set_task(self, city, pos, tile):
-        self.task_maker = TaskMaker(city, pos, tile)
+    def set_task(self, labor, pos, tile):
+        self.task_maker = TaskMaker(labor, pos, tile)
         if self.task_maker.task.type == "build field":
             self.to_field.toggle_on()
         elif self.task_maker.task.type == "build city":

@@ -42,18 +42,18 @@ class World:
         self.city_graph = {self.get_tile(self.current_pos): []}
         self.population = self.get_city().population
 
-    def construct_tiles(self, city):
-        for (x, y), build_type in city.construction:
+    def construct_tiles(self, labor):
+        for (x, y), build_type in labor.construction:
             if build_type == "build plain":
                 self.tiles[y][x] = None
             elif build_type == "build field":
                 self.tiles[y][x] = Field()
             else:
-                city = City()
-                self.connect_city(city)
-                self.tiles[y][x] = city
-            city.remove_task((x, y))
-        city.construction = []
+                settlement = City()
+                self.connect_city(settlement)
+                self.tiles[y][x] = settlement
+            labor.remove_task((x, y))
+        labor.construction = []
 
     def update(self):
         for row in self.tiles:
@@ -64,19 +64,16 @@ class World:
         self.population = 0
         for city in self.city_graph:
             city.update()
-            self.construct_tiles(city)
+            self.construct_tiles(city.labor)
             self.population += city.population
 
 
-class City:
+class Labor:
     def __init__(self):
-        self.population = 32
-        self.morale = .5
-        self.food_supply = 0
-
         self.tasks = {}
         self.construction = []
 
+        self.available = 0
         self.hunters = 0
         self.farmers = 0
 
@@ -94,15 +91,26 @@ class City:
             del self.tasks[pos]
 
     def complete_tasks(self):
+        resources = 0
         for pos in self.tasks.keys():
             task = self.tasks[pos]
             if task.type == "collect":
-                self.food_supply += task.tile.collect(task.workers)
+                resources += task.tile.collect(task.workers)
             else:
                 self.construction.append((pos, task.type))
+        return resources
+
+
+class City:
+    def __init__(self):
+        self.population = 32
+        self.morale = .5
+        self.food_supply = 0
+
+        self.labor = Labor()
 
     def update(self):
-        self.complete_tasks()
+        self.food_supply += self.labor.complete_tasks()
         decrease = 0
 
         if self.population > self.food_supply:
@@ -110,7 +118,7 @@ class City:
             self.food_supply = 0
             growth = .1
         else:
-            demand = (self.hunters * 6 + self.farmers * 5 + (self.population - self.hunters - self.farmers) * 4)
+            demand = (self.labor.hunters * 6 + self.labor.farmers * 5 + (self.population - self.labor.hunters - self.labor.farmers) * 4)
             fullness = self.food_supply / demand
             growth = .5 + (3 - .5) * fullness if fullness < 1 else 1
             self.food_supply -= min(demand, self.food_supply)
