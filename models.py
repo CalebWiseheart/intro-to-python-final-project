@@ -52,7 +52,7 @@ class World:
                 city = City()
                 self.connect_city(city)
                 self.tiles[y][x] = city
-            del city.tasks[(x, y)]
+            city.remove_task((x, y))
         city.construction = []
 
     def update(self):
@@ -71,10 +71,12 @@ class World:
 class City:
     def __init__(self):
         self.population = 32
-        self.morale = 50
+        self.morale = .5
         self.food_supply = 0
+
         self.tasks = {}
         self.construction = []
+
         self.hunters = 0
         self.farmers = 0
 

@@ -33,6 +33,8 @@ def main():
 
     def update_and_refresh():
         wilderness_menu.close()
+        plain_menu.close()
+        field_menu.close()
         world.update()
         viewport.render_background(world.tiles)
 
@@ -82,18 +84,19 @@ def main():
                         wilderness_menu.close()
                         wilderness_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
                         wilderness_menu.set_task(world.get_city(), tile_pos, tile)
-                        field_menu.kill()
-                        plain_menu.kill()
+                        field_menu.close()
+                        plain_menu.close()
                     elif type(tile) is Field:
                         field_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
                         wilderness_menu.close()
-                        plain_menu.kill()
+                        plain_menu.close()
                     elif type(tile) is City:
                         pass
                     else:
                         plain_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
+                        plain_menu.set_task(world.get_city(), tile_pos, tile)
                         wilderness_menu.close()
-                        field_menu.kill()
+                        field_menu.close()
 
         ui.update()
         anchor_all(ui, viewport.rect)

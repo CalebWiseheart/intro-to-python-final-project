@@ -244,9 +244,8 @@ class TileMenu(Menu):
 # city, the task to give to the city, the position of the tasks tile, and hard coded ui elements; with methods for
 # setting the task, city, and pos after spawning the menu, and for managing the task as the game updates, and for giving
 # the city the task before removing itself from its groups
-class WildernessMenu(Menu):
+class WildernessMenu(TileMenu):
     def __init__(self):
-        self.task_maker = None
         self.counter = Switch((20, 40), "midright", (.9, .3))
         self.to_plain = Option("Burn Down", "midleft", (.15, .6))
 
@@ -277,10 +276,12 @@ class WildernessMenu(Menu):
             elif self.to_plain.on and self.task_maker.task.type == "collect":
                 self.task_maker.task = Task.build_plain(self.task_maker.tile)
                 self.counter.count = self.task_maker.task.workers
+            elif self.to_plain.on:
+                self.counter.count = self.task_maker.task.workers
 
-class PlainMenu(Menu):
+
+class PlainMenu(TileMenu):
     def __init__(self):
-        self.task = None
         self.to_field = Option("Till", "center", (.5, .50))
         self.to_city = Option("Settle", "center", (.5, .75))
         self.to_field.alts.append(self.to_city)
@@ -291,10 +292,29 @@ class PlainMenu(Menu):
             self.to_city
         ])
 
-    def set_task(self):
-        pass
+    def set_task(self, city, pos, tile):
+        self.task_maker = TaskMaker(city, pos, tile)
+        if self.task_maker.task.type == "build field":
+            self.to_field.toggle_on()
+        elif self.task_maker.task.type == "build city":
+            self.to_city.toggle_on()
+        else:
+            self.to_field.toggle_off()
+            self.to_city.toggle_off()
 
-class FieldMenu(Menu):
+    def update(self):
+        self.elements.update()
+        self.render()
+
+        if self.task_maker is not None:
+            if self.to_field.on and self.task_maker.task.type != "build field":
+                self.task_maker.task = Task.build_field(self.task_maker.task.tile)
+            elif self.to_city.on and self.task_maker.task.type != "build city":
+                self.task_maker.task = Task.build_city(self.task_maker.task.tile)
+            elif not self.to_field.on and not self.to_city.on and self.task_maker.task.workers != 0:
+                self.task_maker.task = Task.collect(self.task_maker.task.tile)
+
+class FieldMenu(TileMenu):
     def __init__(self):
         super().__init__((250, 375), [
             Text("Field", "center", (.5, .15)),
@@ -303,4 +323,5 @@ class FieldMenu(Menu):
         ])
 
     def update(self):
-        pass
+        self.elements.update()
+        self.render()
