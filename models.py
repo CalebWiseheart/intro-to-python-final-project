@@ -43,7 +43,9 @@ class World:
         self.population = self.get_city().population
 
     def construct_tiles(self, labor):
-        for (x, y), build_type in labor.construction:
+        while labor.construction:
+            (x, y), build_type = labor.construction.pop()
+
             if build_type == "build plain":
                 self.tiles[y][x] = None
             elif build_type == "build field":
@@ -52,8 +54,8 @@ class World:
                 settlement = City()
                 self.connect_city(settlement)
                 self.tiles[y][x] = settlement
+
             labor.remove_task((x, y))
-        labor.construction = []
 
     def update(self):
         for row in self.tiles:
@@ -83,15 +85,36 @@ class Labor:
         else:
             return None
 
+    def get_hunger(self):
+        return self.hunters * 6 + self.farmers * 5 + self.available * 4
+
     def add_task(self, pos, task):
+        self.available -= task.workers
+
+        is_collect = task.type == "collect"
+        if is_collect and type(task.tile) is Wilderness:
+            self.hunters += task.workers
+        elif is_collect:
+            self.farmers += task.workers
+
         self.tasks[pos] = task
 
     def remove_task(self, pos):
         if pos in self.tasks:
+            task = self.tasks[pos]
+            self.available += task.workers
+
+            is_collect = task.type == "collect"
+            if is_collect and type(task.tile) is Wilderness:
+                self.hunters -= task.workers
+            elif is_collect:
+                self.farmers -= task.workers
+
             del self.tasks[pos]
 
     def complete_tasks(self):
         resources = 0
+
         for pos in self.tasks.keys():
             task = self.tasks[pos]
             if task.type == "collect":
@@ -104,28 +127,35 @@ class Labor:
 class City:
     def __init__(self):
         self.population = 32
-        self.morale = .5
+        self.morale = .1
+        self.fullness = 0
         self.food_supply = 0
 
         self.labor = Labor()
 
     def update(self):
         self.food_supply += self.labor.complete_tasks()
-        decrease = 0
 
-        if self.population > self.food_supply:
-            decrease += self.population - self.food_supply
-            self.food_supply = 0
-            growth = .1
-        else:
-            demand = (self.labor.hunters * 6 + self.labor.farmers * 5 + (self.population - self.labor.hunters - self.labor.farmers) * 4)
-            fullness = self.food_supply / demand
-            growth = .5 + (3 - .5) * fullness if fullness < 1 else 1
-            self.food_supply -= min(demand, self.food_supply)
+        starvation = max(self.population - self.food_supply, 0)
+        disease = 0
+        natural = 0
+        decrease = starvation + disease + natural
 
-        increase = round(self.population * growth)
-        decrease = round(decrease)
+        hunger = self.labor.get_hunger()
+        fullness = min(self.food_supply / hunger if not starvation else 0, 1)
+
+        self.morale += delta_morale(fullness - self.fullness, decrease / self.population)
+
+        self.food_supply -= min(hunger, self.food_supply)
+
+        increase = round(self.population * fullness * self.morale)
         self.population += increase - decrease
+
+
+def delta_morale(delta_full, mortal):
+    # delta_full: [-1, 1] other args: [0, 1]
+    # mortal main downward drive
+    return delta_full if delta_full >=0 else delta_full / 3 - mortal  # implement a cap, current [-1.33, 1]
 
 
 @dataclass
