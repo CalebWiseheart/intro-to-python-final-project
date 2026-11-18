@@ -50,12 +50,12 @@ class Info(Text):
     def __init__(self, obj, name, attr, pos,  header=False):
         self.obj = obj
         self.name = name
-        self.text = str(getattr(self.obj, self.name))
+        self.text = str(getattr(self.obj, self.name)) if self.obj else "0"
 
         super().__init__(self.text, attr, pos, header)
 
     def update(self):
-        data = str(getattr(self.obj, self.name))
+        data = str(getattr(self.obj, self.name)) if self.obj else "0"
         if data != self.text:
             self.text = data
             self.render(self.text)
@@ -84,11 +84,11 @@ class Button(UIElement):
 
 
 class Switch(UIElement):
-    def __init__(self, size, attr, pos):
+    def __init__(self, attr, pos):
         super().__init__(attr, pos)
         self.count = 0
-        self.image = pg.Surface((size[0], size[1]))
-        self.rect = pg.Rect(0, 0, size[0], size[1])
+        self.image = pg.Surface((20, 40))
+        self.rect = self.image.get_rect()
         self.render()
 
     def render(self):
@@ -108,7 +108,7 @@ class Switch(UIElement):
         ])
 
     def click(self, mouse):
-        if mouse[0] < self.rect.centerx:
+        if mouse[1] < self.rect.centery:
             self.count += 16
         else:
             self.count = self.count - 16 if self.count > 0 else 0
@@ -246,8 +246,9 @@ class TileMenu(Menu):
 # the city the task before removing itself from its groups
 class WildernessMenu(TileMenu):
     def __init__(self):
-        self.counter = Switch((20, 40), "midright", (.9, .3))
+        self.counter = Switch("midright", (.9, .3))
         self.to_plain = Option("Burn Down", "midleft", (.15, .6))
+        self.last_yield = Info(None, "produced", "midright", (.8, .4))
 
         super().__init__((250, 375), [
             Text("Wilderness", "center", (.5, .15)),
@@ -255,6 +256,7 @@ class WildernessMenu(TileMenu):
             Text("Last Yield: ", "midleft", (.1, .4)),
             self.counter,
             Info(self.counter, "count", "midright", (.8, .3)),
+            self.last_yield,
             self.to_plain
         ])
 
@@ -262,13 +264,14 @@ class WildernessMenu(TileMenu):
     # new task maker constructed using the city, position, and tile, then sets its counters count to the tasks workers
     def set_task(self, labor, pos, tile):
         self.task_maker = TaskMaker(labor, pos, tile)
+        self.last_yield.obj = tile
         self.counter.count = self.task_maker.task.workers
 
     def update(self):
         self.elements.update()
         self.render()
 
-        if self.task_maker is not None:
+        if self.task_maker is not None:  # denest the check for to_plain.on
             if not self.to_plain.on and self.task_maker.task.type != "collect":
                 self.task_maker.task = Task.collect(self.task_maker.task.tile, self.task_maker.task.workers)
             if not self.to_plain.on and self.task_maker.task.workers != self.counter.count:
@@ -278,6 +281,25 @@ class WildernessMenu(TileMenu):
                 self.counter.count = self.task_maker.task.workers
             elif self.to_plain.on:
                 self.counter.count = self.task_maker.task.workers
+
+
+class FieldMenu(TileMenu):
+    def __init__(self):
+        self.counter = Switch("midright", (.9, .3))
+        super().__init__((250, 375), [
+            Text("Field", "center", (.5, .15)),
+            self.counter,
+            Info(self.counter, "count", "midright", (.8, .3)),
+            Text("Farmers: ", "midleft", (.1, .3)),
+            Text("Last Yield: ", "midleft", (.1, .4))
+        ])
+
+    def update(self):
+        self.elements.update()
+        self.render()
+
+        if self.task_maker is not None and self.task_maker.task.workers != self.counter.count:
+            self.task_maker.task.workers = self.counter.count
 
 
 class PlainMenu(TileMenu):
@@ -313,15 +335,3 @@ class PlainMenu(TileMenu):
                 self.task_maker.task = Task.build_city(self.task_maker.task.tile)
             elif not self.to_field.on and not self.to_city.on and self.task_maker.task.workers != 0:
                 self.task_maker.task = Task.collect(self.task_maker.task.tile)
-
-class FieldMenu(TileMenu):
-    def __init__(self):
-        super().__init__((250, 375), [
-            Text("Field", "center", (.5, .15)),
-            Text("Farmers: ", "midleft", (.1, .3)),
-            Text("Last Yield: ", "midleft", (.1, .4))
-        ])
-
-    def update(self):
-        self.elements.update()
-        self.render()

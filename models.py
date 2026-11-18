@@ -153,9 +153,8 @@ class City:
 
 
 def delta_morale(delta_full, mortal):
-    # delta_full: [-1, 1] other args: [0, 1]
-    # mortal main downward drive
-    return delta_full if delta_full >=0 else delta_full / 3 - mortal  # implement a cap, current [-1.33, 1]
+    # delta_full: [-1, 1] mortal: [0, 1]
+    return delta_full if delta_full >=0 else delta_full / 3 - mortal  # [-1.33, 1]
 
 
 @dataclass
@@ -180,22 +179,32 @@ class Task:
     def build_city(tile):
         return Task(64, tile, "build city")
 
-class Wilderness:
-    def __init__(self):
-        self.resources = 1000
+
+class Resource:
+    def __init__(self, cap):
+        self.carry_cap = cap
+        self.resources = cap
+        self.produced = 0
 
     def collect(self, workers):
-        taken = workers * 2
-        self.resources -= taken
-        return taken
+        return self.produced
 
     def update(self):
-        self.resources += self.resources * (1 - self.resources / 1000)
+        self.resources += self.resources * (1 - self.resources / self.carry_cap)
 
 
-class Field:
+class Wilderness(Resource):
     def __init__(self):
-        pass
+        super().__init__(10000)
 
-    def update(self):
-        pass
+    def collect(self, workers):
+        self.produced = round(1.5 * workers if workers <= 64 else -1 * (workers - 64) + 6)
+        return self.produced
+
+
+class Field(Resource):
+    def __init__(self):
+        super().__init__(100000)
+
+    def collect(self, workers):
+        return
