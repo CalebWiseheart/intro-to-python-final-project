@@ -154,7 +154,7 @@ class City:
 
 def delta_morale(delta_full, mortal):
     # delta_full: [-1, 1] mortal: [0, 1]
-    return delta_full if delta_full >=0 else delta_full / 3 - mortal  # [-1.33, 1]
+    return delta_full if delta_full >=0 else delta_full / 4 - mortal  # [-1.25, 1]
 
 
 @dataclass
@@ -207,4 +207,4 @@ class Field(Resource):
         super().__init__(100000)
 
     def collect(self, workers):
-        return
+        return self.produced

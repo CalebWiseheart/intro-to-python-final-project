@@ -1,6 +1,6 @@
 import pygame as pg
 from visuals import Viewport, Highlighter
-from user_interface import WildernessMenu, PlainMenu, FieldMenu, Button, Info
+from user_interface import CityMenu, WildernessMenu, PlainMenu, FieldMenu, Button, Info
 from models import World, City, Wilderness, Field
 
 FRAMERATE = 60
@@ -27,24 +27,28 @@ def main():
 
     highlighter = Highlighter()
 
+    city_menu = CityMenu(world.get_city())
     wilderness_menu = WildernessMenu()
     plain_menu = PlainMenu()
     field_menu = FieldMenu()
 
-    def close_menus():
+    def close_menus(close_all=False):
         wilderness_menu.close()
         plain_menu.close()
         field_menu.close()
+        if close_all:
+            city_menu.close()
 
 
     def update_and_refresh():
-        close_menus()
+        close_menus(True)
         world.update()
         viewport.render_background(world.tiles)
 
     button = Button(render_button(), update_and_refresh, "topright", (.99, .01))
     population = Info(world, "population", "center", (.5, .05), True)
     ui = pg.sprite.LayeredUpdates(button, population)
+    city_menu.spawn(ui, viewport.rect, "topleft", (.01, .01))
     anchor_all(ui, viewport.rect)
 
     running = True

@@ -304,18 +304,21 @@ class FieldMenu(TileMenu):
 
 class PlainMenu(TileMenu):
     def __init__(self):
+        self.workers = Info(None, "available", "center", (.5, .35))
         self.to_field = Option("Till", "center", (.5, .50))
         self.to_city = Option("Settle", "center", (.5, .75))
         self.to_field.alts.append(self.to_city)
         self.to_city.alts.append(self.to_field)
         super().__init__((200, 200), [
             Text("Plains", "center", (.5, .25)),
+            self.workers,
             self.to_field,
             self.to_city
         ])
 
     def set_task(self, labor, pos, tile):
         self.task_maker = TaskMaker(labor, pos, tile)
+        self.workers.obj = self.task_maker.task
         if self.task_maker.task.type == "build field":
             self.to_field.toggle_on()
         elif self.task_maker.task.type == "build city":
@@ -335,3 +338,31 @@ class PlainMenu(TileMenu):
                 self.task_maker.task = Task.build_city(self.task_maker.task.tile)
             elif not self.to_field.on and not self.to_city.on and self.task_maker.task.workers != 0:
                 self.task_maker.task = Task.collect(self.task_maker.task.tile)
+
+
+class CityMenu(Menu):
+    def __init__(self, city):
+        self.population = Info(city, "population", "midright", (.9, .3))
+        self.free_workers = Info(city.labor, "available", "midright", (.9, .4))
+        self.fullness = Info(city, "fullness", "midright", (.9, .5))
+        self.morale = Info(city, "morale", "midright", (.9, .6))
+        self.surplus = Info(city, "food_supply", "midright", (.9, .7))
+
+        super().__init__((250, 375), [
+            Text("City Info", "center", (.5, .15)),
+            Text("Population:", "midleft", (.1, .3)),
+            Text("Free Workers:", "midleft", (.1, .4)),
+            Text("Fullness:", "midleft", (.1, .5)),
+            Text("Morale:", "midleft", (.1, .6)),
+            Text("Surplus:", "midleft", (.1, .7)),
+            self.population,
+            self.free_workers,
+            self.fullness,
+            self.morale,
+            self.surplus
+        ])
+
+    def set_city(self, city):
+        self.population.obj = city
+        self.free_workers.obj = city.labor
+        self.fullness.obj = city
