@@ -1,7 +1,7 @@
 import pygame as pg
 from visuals import Viewport, Highlighter
 from user_interface import CityMenu, WildernessMenu, PlainMenu, FieldMenu, Button, Info
-from models import World, City, Wilderness, Field
+from models import World, City, Wilderness, Field, distance
 
 FRAMERATE = 60
 
@@ -67,11 +67,11 @@ def main():
             elif event.type == pg.MOUSEBUTTONDOWN:
                 mouse = pg.mouse.get_pos()
                 interaction = ui.get_sprites_at(mouse)
+                tile_pos = viewport.screen_to_world(mouse)
                 if interaction:
-                    element = interaction[0]
-                    element.click(mouse)
+                    for element in interaction:
+                        element.click(mouse)
                 else:
-                    tile_pos = viewport.screen_to_world(mouse)
                     highlighter.select(tile_pos, viewport)
                     tile = world.get_tile(tile_pos)
 
@@ -90,14 +90,31 @@ def main():
 
                     if type(tile) is Wilderness:
                         close_menus()
-                        wilderness_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
-                        wilderness_menu.set_task(world.get_city().labor, tile_pos, tile)
+                        if distance(world.current_pos, tile_pos) > 3:
+                            highlighter.deselect()
+                        else:
+                            wilderness_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
+                            wilderness_menu.set_task(world.get_city().labor, tile_pos, tile)
                     elif type(tile) is Field:
                         close_menus()
-                        field_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
-                        field_menu.set_task(world.get_city().labor, tile_pos, tile)
+                        if distance(world.current_pos, tile_pos) > 3:
+                            highlighter.deselect()
+                        else:
+                            field_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)
+                            field_menu.set_task(world.get_city().labor, tile_pos, tile)
+                    elif type(tile) is City and tile_pos == world.current_pos:
+                        highlighter.deselect()
+                        if city_menu in ui.sprites():
+                            city_menu.close()
+                        else:
+                            city_menu.spawn(ui, viewport.rect, "topleft", (.01, .01))
                     elif type(tile) is City:
-                        pass
+                        highlighter.deselect()
+                        world.current_pos = tile_pos
+                        viewport.set_center(world.current_pos)
+                        viewport.render_background(world.tiles)
+                        city_menu.set_city(world.get_city())
+                        city_menu.spawn(ui, viewport.rect, "topleft", (.01, .01))
                     else:
                         close_menus()
                         plain_menu.spawn(ui, viewport.rect, spawn_attr, spawn_pos)

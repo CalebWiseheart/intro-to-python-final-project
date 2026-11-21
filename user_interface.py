@@ -1,5 +1,6 @@
 import pygame as pg
-from models import Task
+from models import Task, Labor
+
 
 # Base class representing a sprite that can be interacted with by the user through the mouse to set options with a
 # nonfixed position; through a position normalized between 0 and 1 on an arbitrary parent rect, and the attribute of its
@@ -214,6 +215,20 @@ class TaskMaker:
         last_task = self.labor.get_task(self.pos)
         self.task = last_task if last_task is not None else Task.collect(tile)
 
+    def set_task(self, task):
+        self.return_workers()
+        self.task = task
+        self.task.workers = self.labor.take_workers(task.workers)
+
+    # Given a number of workers, adds workers or 0 to the tasks workers, and updates the available workers
+    def set_workers(self, workers):
+        # When a construction task takes workers they are never given back
+        self.task.workers += self.labor.take_workers(workers - self.task.workers)
+
+    def return_workers(self):
+        self.labor.take_workers(-self.task.workers)
+        self.task.workers = 0
+
     def send(self):
         if self.task.workers > 0:
             self.labor.add_task(self.pos, self.task)
@@ -266,20 +281,23 @@ class WildernessMenu(TileMenu):
         self.task_maker = TaskMaker(labor, pos, tile)
         self.last_yield.obj = tile
         self.counter.count = self.task_maker.task.workers
+        self.to_plain.on = self.task_maker.task.type == "build plain"
 
     def update(self):
         self.elements.update()
         self.render()
 
-        if self.task_maker is not None:  # denest the check for to_plain.on
-            if not self.to_plain.on and self.task_maker.task.type != "collect":
-                self.task_maker.task = Task.collect(self.task_maker.task.tile, self.task_maker.task.workers)
-            if not self.to_plain.on and self.task_maker.task.workers != self.counter.count:
-                self.task_maker.task.workers = self.counter.count
-            elif self.to_plain.on and self.task_maker.task.type == "collect":
-                self.task_maker.task = Task.build_plain(self.task_maker.tile)
+        if self.task_maker is not None and not self.to_plain.on:
+            if self.task_maker.task.type != "collect":
+                self.task_maker.set_task(Task.collect(self.task_maker.task.tile, self.task_maker.task.workers))
+            if self.task_maker.task.workers != self.counter.count:
+                self.task_maker.set_workers(self.counter.count)
                 self.counter.count = self.task_maker.task.workers
-            elif self.to_plain.on:
+        if self.task_maker is not None and self.to_plain.on:
+            if self.task_maker.task.type == "collect":
+                self.task_maker.set_task(Task.build_plain(self.task_maker.tile))
+                self.counter.count = self.task_maker.task.workers
+            elif self.task_maker.task.workers != self.counter.count:
                 self.counter.count = self.task_maker.task.workers
 
 
@@ -299,12 +317,13 @@ class FieldMenu(TileMenu):
         self.render()
 
         if self.task_maker is not None and self.task_maker.task.workers != self.counter.count:
-            self.task_maker.task.workers = self.counter.count
+            self.task_maker.set_workers(self.counter.count)
+            self.counter.count = self.task_maker.task.workers
 
 
 class PlainMenu(TileMenu):
     def __init__(self):
-        self.workers = Info(None, "available", "center", (.5, .35))
+        self.workers = Info(None, "workers", "center", (.5, .35))
         self.to_field = Option("Till", "center", (.5, .50))
         self.to_city = Option("Settle", "center", (.5, .75))
         self.to_field.alts.append(self.to_city)
@@ -333,11 +352,11 @@ class PlainMenu(TileMenu):
 
         if self.task_maker is not None:
             if self.to_field.on and self.task_maker.task.type != "build field":
-                self.task_maker.task = Task.build_field(self.task_maker.task.tile)
+                self.task_maker.set_task(Task.build_field(self.task_maker.task.tile))
             elif self.to_city.on and self.task_maker.task.type != "build city":
-                self.task_maker.task = Task.build_city(self.task_maker.task.tile)
+                self.task_maker.set_task(Task.build_city(self.task_maker.task.tile))
             elif not self.to_field.on and not self.to_city.on and self.task_maker.task.workers != 0:
-                self.task_maker.task = Task.collect(self.task_maker.task.tile)
+                self.task_maker.set_task(Task.collect(self.task_maker.task.tile))
 
 
 class CityMenu(Menu):

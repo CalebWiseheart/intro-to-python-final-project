@@ -50,7 +50,7 @@ class World:
                 self.tiles[y][x] = None
             elif build_type == "build field":
                 self.tiles[y][x] = Field()
-            else:
+            else:  # TODO: remove population of new city from old city
                 settlement = City()
                 self.connect_city(settlement)
                 self.tiles[y][x] = settlement
@@ -71,11 +71,11 @@ class World:
 
 
 class Labor:
-    def __init__(self):
+    def __init__(self, workers):
         self.tasks = {}
         self.construction = []
 
-        self.available = 0
+        self.available = workers
         self.hunters = 0
         self.farmers = 0
 
@@ -88,9 +88,33 @@ class Labor:
     def get_hunger(self):
         return self.hunters * 6 + self.farmers * 5 + self.available * 4
 
-    def add_task(self, pos, task):
-        self.available -= task.workers
+    def take_workers(self, workers):
+        if workers <= self.available:
+            self.available -= workers
+            return workers
+        else:
+            return 0
 
+    # Given a change in population, adds the change to the available workers, and if there are no longer enough workers
+    # to complete all the tasks, then workers are removed from each task until the total number of workers is equal to
+    # the population, starting from the task with the lowest last yield to the highest
+    def add_available(self, delta):
+        self.available += delta
+        if self.available < 0:
+            for task in sorted(self.tasks.values(), key=lambda value: value.tile.produced):
+                if task.workers >= -self.available:
+                    task.workers += self.available
+                    self.hunters += self.available if type(task.tile) is Wilderness else 0
+                    self.farmers += self.available if type(task.tile) is Field else 0
+                    self.available = 0
+                    break
+                else:
+                    self.available += task.workers
+                    self.hunters -= task.workers if type(task.tile) is Wilderness else 0
+                    self.farmers -= task.workers if type(task.tile) is Field else 0
+                    task.workers = 0
+
+    def add_task(self, pos, task):
         is_collect = task.type == "collect"
         if is_collect and type(task.tile) is Wilderness:
             self.hunters += task.workers
@@ -126,12 +150,12 @@ class Labor:
 
 class City:
     def __init__(self):
-        self.population = 32
+        self.population = 128
         self.morale = .1
         self.fullness = 0
         self.food_supply = 0
 
-        self.labor = Labor()
+        self.labor = Labor(self.population)
 
     def update(self):
         self.food_supply += self.labor.complete_tasks()
@@ -143,13 +167,15 @@ class City:
 
         hunger = self.labor.get_hunger()
         fullness = min(self.food_supply / hunger if not starvation else 0, 1)
-
-        self.morale += delta_morale(fullness - self.fullness, decrease / self.population)
-
         self.food_supply -= min(hunger, self.food_supply)
 
+        self.morale += delta_morale(fullness - self.fullness, decrease / self.population)
+        self.morale = round(self.morale, 2)
+
         increase = round(self.population * fullness * self.morale)
-        self.population += increase - decrease
+        delta = increase - decrease
+        self.population += delta
+        self.labor.add_available(delta)
 
 
 def delta_morale(delta_full, mortal):
@@ -177,7 +203,7 @@ class Task:
 
     @staticmethod
     def build_city(tile):
-        return Task(64, tile, "build city")
+        return Task(128, tile, "build city")
 
 
 class Resource:
@@ -186,7 +212,7 @@ class Resource:
         self.resources = cap
         self.produced = 0
 
-    def collect(self, workers):
+    def collect(self, workers):  # TODO
         return self.produced
 
     def update(self):
@@ -198,7 +224,6 @@ class Wilderness(Resource):
         super().__init__(10000)
 
     def collect(self, workers):
-        self.produced = round(1.5 * workers if workers <= 64 else -1 * (workers - 64) + 6)
         return self.produced
 
 
@@ -208,3 +233,9 @@ class Field(Resource):
 
     def collect(self, workers):
         return self.produced
+
+
+def distance(at, to):
+    a1, b1 = at
+    a2, b2 = to
+    return math.sqrt((a2 - a1) ** 2 + (b2 - b1) ** 2)
